@@ -12,6 +12,7 @@ export default function AddPlayerAdmin() {
   const [lastName, setLastName] = useState("");
   const [parentEmail, setParentEmail] = useState("");
   const [teamId, setTeamId] = useState("");
+  const [position, setPosition] = useState(""); // ✅ NEW
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,6 +37,7 @@ export default function AddPlayerAdmin() {
         last_name: lastName,
         parent_email: parentEmail,
         team_id: teamId || null,
+        position, // ✅ NEW
       }),
     });
 
@@ -47,10 +49,12 @@ export default function AddPlayerAdmin() {
 
     alert("Player created ✅");
 
+    // ✅ reset form
     setFirstName("");
     setLastName("");
     setParentEmail("");
     setTeamId("");
+    setPosition(""); // ✅ NEW
 
     setLoading(false);
   }
@@ -60,6 +64,8 @@ export default function AddPlayerAdmin() {
       <h1 className="text-2xl font-semibold">Add Player (Admin)</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        
+        {/* FIRST NAME */}
         <input
           placeholder="First name"
           className="border p-3 w-full rounded"
@@ -68,6 +74,7 @@ export default function AddPlayerAdmin() {
           required
         />
 
+        {/* LAST NAME */}
         <input
           placeholder="Last name"
           className="border p-3 w-full rounded"
@@ -76,6 +83,15 @@ export default function AddPlayerAdmin() {
           required
         />
 
+        {/* POSITION (NEW) */}
+        <input
+          placeholder="Position (e.g. CM, GK)"
+          className="border p-3 w-full rounded"
+          value={position}
+          onChange={(e) => setPosition(e.target.value)}
+        />
+
+        {/* PARENT EMAIL */}
         <input
           placeholder="Parent email"
           className="border p-3 w-full rounded"
@@ -83,6 +99,7 @@ export default function AddPlayerAdmin() {
           onChange={(e) => setParentEmail(e.target.value)}
         />
 
+        {/* TEAM SELECT */}
         <select
           className="border p-3 w-full rounded"
           value={teamId}
@@ -96,12 +113,14 @@ export default function AddPlayerAdmin() {
           ))}
         </select>
 
+        {/* SUBMIT */}
         <button
           disabled={loading}
           className="bg-black text-white py-3 w-full rounded"
         >
           {loading ? "Creating…" : "Create Player"}
         </button>
+
       </form>
     </div>
   );

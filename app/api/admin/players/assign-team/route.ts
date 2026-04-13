@@ -7,18 +7,28 @@ export async function POST(req: Request) {
 
   const { player_id, team_id } = body;
 
-  // remove existing team
-  await supabase
+  /* REMOVE EXISTING */
+  const { error: deleteError } = await supabase
     .from("player_team")
     .delete()
     .eq("player_id", player_id);
 
-  // add new team
+  if (deleteError) {
+    console.error("❌ delete failed", deleteError);
+  }
+
+  /* INSERT NEW */
   if (team_id) {
-    await supabase.from("player_team").insert({
-      player_id,
-      team_id,
-    });
+    const { error: insertError } = await supabase
+      .from("player_team")
+      .insert({
+        player_id,
+        team_id,
+      });
+
+    if (insertError) {
+      console.error("❌ insert failed", insertError);
+    }
   }
 
   return NextResponse.json({ success: true });

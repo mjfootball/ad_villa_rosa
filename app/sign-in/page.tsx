@@ -1,10 +1,11 @@
-import { Suspense } from "react";
-import SignInClient from "./SignInClient";
+import { LoginForm } from "@/components/login-form";
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={null}>
-      <SignInClient />
-    </Suspense>
+    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+      <div className="w-full max-w-sm">
+        <LoginForm />
+      </div>
+    </div>
   );
 }
