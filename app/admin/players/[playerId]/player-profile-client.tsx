@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-import { Input } from "@/components/ui/input";
 import {
   Tabs,
   TabsContent,
@@ -10,81 +10,88 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-/* -------------------------
-   TYPES
-------------------------- */
-type Subscription = {
-  id: string;
-  status: string;
-  amount: number;
-  created_at: string;
-  paid_at?: string | null;
-  next_due_date?: string | null;
-};
-
-type Player = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  parent_email?: string | null;
-  date_of_birth?: string | null;
-  notes?: string | null;
-  medical_notes?: string | null;
-  avatar_url?: string | null;
-
-  emergency_contact_name?: string | null;
-  emergency_contact_phone?: string | null;
-
-  subscriptions?: Subscription[];
-};
-
-/* -------------------------
-   HELPERS
-------------------------- */
-function formatDate(date?: string | null) {
-  if (!date) return "—";
-  return new Date(date).toLocaleDateString();
-}
+import PlayerHeader from "@/components/player/PlayerHeader";
+import OverviewTab from "@/components/player/OverviewTab";
+import DetailsTab from "@/components/player/DetailsTab";
+import EmergencyTab from "@/components/player/EmergencyTab";
+import PaymentsTab from "@/components/player/PaymentsTab";
+import HistoryTab from "@/components/player/HistoryTab";
+import TeamTab from "@/components/player/TeamTab";
+import PlayingDataTab from "@/components/player/PlayingDataTab";
+import type { Player } from "@/types/player";
+import type { PlayerForm } from "@/types/forms";
 
 /* -------------------------
    COMPONENT
 ------------------------- */
 export default function PlayerProfileClient({
-  player,
+  player: initialPlayer,
 }: {
   player: Player;
 }) {
-  const [firstName, setFirstName] = useState(player.first_name || "");
-  const [lastName, setLastName] = useState(player.last_name || "");
-  const [email, setEmail] = useState(player.parent_email || "");
+  const router = useRouter();
 
-  const [dob, setDob] = useState(
-    player.date_of_birth
-      ? player.date_of_birth.split("T")[0]
-      : ""
-  );
-
-  const [notes, setNotes] = useState(player.notes || "");
-  const [medical, setMedical] = useState(player.medical_notes || "");
-  const [avatar, setAvatar] = useState(player.avatar_url || "");
-
-  const [emergencyName, setEmergencyName] = useState(
-    player.emergency_contact_name || ""
-  );
-  const [emergencyPhone, setEmergencyPhone] = useState(
-    player.emergency_contact_phone || ""
-  );
-
+  const [player] = useState(initialPlayer);
   const [loading, setLoading] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+
+  /* ✅ NEW: SAVE MESSAGE */
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  /* -------------------------
+     GLOBAL FORM
+  ------------------------- */
+  const [form, setForm] = useState<PlayerForm>({
+    first_name: initialPlayer.first_name || "",
+    last_name: initialPlayer.last_name || "",
+    parent_email: initialPlayer.parent_email || "",
+
+    date_of_birth: initialPlayer.date_of_birth?.split("T")[0] || "",
+    date_joined:
+      (initialPlayer.date_joined || initialPlayer.created_at)
+        ?.split("T")[0] || "",
+
+    preferred_foot: initialPlayer.preferred_foot || "",
+
+    notes: initialPlayer.notes || "",
+    medical_notes: initialPlayer.medical_notes || "",
+
+    emergency_contact_name:
+      initialPlayer.emergency_contact_name || "",
+    emergency_contact_phone:
+      initialPlayer.emergency_contact_phone || "",
+
+    preferred_position: initialPlayer.preferred_position || "",
+    secondary_position: initialPlayer.secondary_position || "",
+    height_cm: initialPlayer.height_cm || "",
+    strengths: initialPlayer.strengths || "",
+    development_notes: initialPlayer.development_notes || "",
+    injured: initialPlayer.injured || false,
+  });
+
+  /* -------------------------
+     DIRTY TRACKING
+  ------------------------- */
+  function updateForm(
+    updater: (prev: PlayerForm) => PlayerForm
+  ) {
+    setForm((prev) => {
+      const updated = updater(prev);
+
+      if (JSON.stringify(prev) !== JSON.stringify(updated)) {
+        setIsDirty(true);
+      }
+
+      return updated;
+    });
+  }
+
+  /* -------------------------
+     REFRESH PLAYER
+  ------------------------- */
+  function refreshPlayer() {
+    router.refresh();
+  }
 
   /* -------------------------
      SAVE
@@ -100,196 +107,192 @@ export default function PlayerProfileClient({
         },
         body: JSON.stringify({
           id: player.id,
-          first_name: firstName,
-          last_name: lastName,
-          parent_email: email,
-          date_of_birth: dob || null,
-          notes,
-          medical_notes: medical,
-          avatar_url: avatar,
-          emergency_contact_name: emergencyName,
-          emergency_contact_phone: emergencyPhone,
+          ...form,
         }),
       });
 
       if (!res.ok) throw new Error("Failed");
 
-      alert("Saved ✅");
-    } catch (err) {
-      console.error(err);
-      alert("Save failed ❌");
+      refreshPlayer();
+
+      setIsDirty(false);
+
+      /* ✅ INLINE SUCCESS MESSAGE */
+      setSaveMessage("Changes saved successfully");
+
+      setTimeout(() => {
+        setSaveMessage(null);
+      }, 3000);
+
+    } catch {
+      setSaveMessage("Save failed ❌");
+
+      setTimeout(() => {
+        setSaveMessage(null);
+      }, 3000);
     } finally {
       setLoading(false);
     }
   }
 
   /* -------------------------
-     UPLOAD AVATAR
+     REFRESH WARNING
   ------------------------- */
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("player_id", player.id);
-
-    const res = await fetch("/api/admin/players/upload-avatar", {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await res.json();
-
-    if (data.url) setAvatar(data.url);
-  }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () =>
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
   /* -------------------------
-     UI
+     LINK GUARD
+  ------------------------- */
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (!isDirty) return;
+
+      const target = e.target as HTMLElement;
+      const anchor = target.closest("a");
+
+      if (!anchor) return;
+
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("#")) return;
+
+      if (href.startsWith("/")) {
+        e.preventDefault();
+
+        const confirmLeave = window.confirm(
+          "You have unsaved changes. Leave without saving?"
+        );
+
+        if (confirmLeave) {
+          router.push(href);
+        }
+      }
+    };
+
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, [isDirty, router]);
+
+  /* -------------------------
+     BACK BUTTON GUARD
+  ------------------------- */
+  useEffect(() => {
+    const handlePopState = () => {
+      if (!isDirty) return;
+
+      const confirmLeave = window.confirm(
+        "You have unsaved changes. Leave without saving?"
+      );
+
+      if (!confirmLeave) {
+        history.pushState(null, "", location.href);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () =>
+      window.removeEventListener("popstate", handlePopState);
+  }, [isDirty]);
+
+  /* -------------------------
+     RENDER
   ------------------------- */
   return (
     <div className="p-10 max-w-5xl mx-auto space-y-6">
 
-      {/* HEADER */}
-      <div className="flex items-center gap-4">
-        <div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center text-lg font-medium">
-          {avatar ? (
-            <img
-              src={avatar}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span>
-              {firstName?.[0]}
-              {lastName?.[0]}
-            </span>
-          )}
-        </div>
+      <PlayerHeader player={player} />
 
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold">
-            {firstName} {lastName}
-          </h1>
-
-          <input type="file" onChange={handleUpload} />
-        </div>
-      </div>
-
-      {/* TABS */}
       <Tabs defaultValue="overview">
 
         <TabsList className="mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="emergency">Emergency</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="history">Playing History</TabsTrigger>
+          <TabsTrigger value="playing">Playing Data</TabsTrigger>
         </TabsList>
 
-        {/* OVERVIEW */}
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-            <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
-          </div>
-
-          <Input value={email} onChange={(e) => setEmail(e.target.value)} />
+        <TabsContent value="overview">
+          <OverviewTab form={form} setForm={updateForm} />
         </TabsContent>
 
-        {/* DETAILS */}
-        <TabsContent value="details" className="space-y-4">
-          <input
-            type="date"
-            value={dob || ""}
-            onChange={(e) => setDob(e.target.value)}
-            className="border p-2 rounded w-full"
-          />
-
-          <Input value={medical} onChange={(e) => setMedical(e.target.value)} />
-          <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <TabsContent value="details">
+          <DetailsTab form={form} setForm={updateForm} />
         </TabsContent>
 
-        {/* EMERGENCY */}
-        <TabsContent value="emergency" className="space-y-4">
-          <Input value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} />
-          <Input value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
+        <TabsContent value="team">
+          <TeamTab player={player} />
         </TabsContent>
 
-        {/* 💰 PAYMENTS TABLE */}
-        <TabsContent value="payments" className="space-y-4">
+        <TabsContent value="emergency">
+          <EmergencyTab form={form} setForm={updateForm} />
+        </TabsContent>
 
-          {player.subscriptions?.length ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Paid</TableHead>
-                  <TableHead>Next Due</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
+        <TabsContent value="payments">
+          <PaymentsTab player={player} />
+        </TabsContent>
 
-              <TableBody>
-                {player.subscriptions.map((sub, index) => {
-                  const isActive = sub.status === "active";
+        <TabsContent value="history">
+          <HistoryTab player={player} onUpdate={refreshPlayer} />
+        </TabsContent>
 
-                  const isOverdue =
-                    sub.status !== "active" &&
-                    sub.next_due_date &&
-                    new Date(sub.next_due_date) < new Date();
-
-                  return (
-                    <TableRow key={sub.id}>
-                      <TableCell className="font-medium">
-                        INV-{index + 1}
-                      </TableCell>
-
-                      <TableCell
-                        className={
-                          isActive
-                            ? "text-green-600"
-                            : isOverdue
-                            ? "text-red-600"
-                            : "text-gray-500"
-                        }
-                      >
-                        {isActive
-                          ? "Active"
-                          : isOverdue
-                          ? "Overdue"
-                          : "Unpaid"}
-                      </TableCell>
-
-                      <TableCell>{formatDate(sub.paid_at)}</TableCell>
-                      <TableCell>{formatDate(sub.next_due_date)}</TableCell>
-
-                      <TableCell className="text-right">
-                        €{(sub.amount / 100).toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="border p-6 rounded text-sm text-gray-500">
-              No payments found
-            </div>
-          )}
-
+        <TabsContent value="playing">
+          <PlayingDataTab form={form} setForm={updateForm} />
         </TabsContent>
 
       </Tabs>
 
-      {/* SAVE */}
-      <button
-        onClick={saveProfile}
-        disabled={loading}
-        className="bg-black text-white px-6 py-2 rounded"
-      >
-        {loading ? "Saving..." : "Save Changes"}
-      </button>
+      {/* SAVE BAR */}
+{(isDirty || saveMessage) && (
+  <div className="sticky bottom-0 bg-white border-t p-4 flex justify-between items-center">
 
+    <div className="flex items-center gap-4">
+      
+      {isDirty && (
+        <span className="text-sm text-gray-600">
+          You have unsaved changes
+        </span>
+      )}
+
+      {saveMessage && (
+        <span
+          className={`text-sm ${
+            saveMessage.includes("failed")
+              ? "text-red-600"
+              : "text-green-600"
+          }`}
+        >
+          {saveMessage}
+        </span>
+      )}
+
+    </div>
+
+    <button
+      onClick={saveProfile}
+      disabled={loading}
+      className="bg-black text-white px-6 py-2 rounded"
+    >
+      {loading
+        ? "Saving..."
+        : isDirty
+        ? "Save Changes"
+        : "Saved ✓"}
+    </button>
+
+  </div>
+      )}
     </div>
   );
 }

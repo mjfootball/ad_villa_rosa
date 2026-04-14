@@ -1,26 +1,61 @@
 import { NextResponse } from "next/server";
+import cloudinary from "@/lib/cloudinary";
 import { supabaseService } from "@/lib/supabase/service";
 
 export async function POST(req: Request) {
-  const supabase = supabaseService();
+  try {
+    const formData = await req.formData();
 
-  const formData = await req.formData();
-  const file = formData.get("file") as File;
-  const playerId = formData.get("player_id") as string;
+    const file = formData.get("file") as File;
+    const playerId = formData.get("player_id") as string;
 
-  const filePath = `players/${playerId}/${file.name}`;
+    if (!file || !playerId) {
+      return NextResponse.json(
+        { error: "Missing file or player_id" },
+        { status: 400 }
+      );
+    }
 
-  const { error } = await supabase.storage
-    .from("avatars")
-    .upload(filePath, file, { upsert: true });
+    // 🔥 Convert file to buffer
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
 
-  if (error) {
-    return NextResponse.json({ error }, { status: 500 });
+    // 🔥 Upload to Cloudinary
+    const upload = await new Promise<any>((resolve, reject) => {
+      cloudinary.uploader
+        .upload_stream(
+          {
+            folder: "players",
+            public_id: playerId,
+            overwrite: true,
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        )
+        .end(buffer);
+    });
+
+    const imageUrl = upload.secure_url;
+
+    // 🔥 Save to DB
+    const supabase = supabaseService();
+
+    const { error } = await supabase
+      .from("players")
+      .update({ avatar_url: imageUrl })
+      .eq("id", playerId);
+
+    if (error) {
+      console.error(error);
+      return NextResponse.json({ error: "DB update failed" }, { status: 500 });
+    }
+
+    return NextResponse.json({ url: imageUrl });
+
+  } catch (err) {
+    console.error("Upload error:", err);
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
-
-  const { data } = supabase.storage
-    .from("avatars")
-    .getPublicUrl(filePath);
-
-  return NextResponse.json({ url: data.publicUrl });
 }

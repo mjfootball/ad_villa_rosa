@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Team } from "@/types/team";
 
 import {
   Table,
@@ -29,14 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-type Team = {
-  id: string;
-  display_name: string;
-  team_name: string;
-  format: string;
-  age_group_name?: string;
-};
 
 type AgeGroup = {
   id: string;

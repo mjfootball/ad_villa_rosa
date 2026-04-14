@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { DataTable } from "./data-table";
+import { DataTable } from "@/components/ui/data-table";
 import { columns, Player } from "./columns";
 
 import {
@@ -16,11 +16,25 @@ import {
   DrawerClose,
 } from "@/components/ui/drawer";
 
-const POSITIONS = ["GK", "DF", "CM", "FW"];
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+
+/* ✅ SINGLE SOURCE OF TRUTH */
+const POSITIONS = [
+  "GK", "RB", "CB", "LB",
+  "CDM", "CM", "CAM",
+  "RW", "LW", "ST",
+];
 
 export default function AdminPlayers() {
   const [players, setPlayers] = useState<Player[]>([]);
-  const [teams, setTeams] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
 
   const [selectedPlayer, setSelectedPlayer] =
@@ -29,40 +43,41 @@ export default function AdminPlayers() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [parentEmail, setParentEmail] = useState("");
-  const [teamId, setTeamId] = useState("none");
-  const [position, setPosition] = useState("");
+  const [dob, setDob] = useState("");
+  const [preferredPosition, setPreferredPosition] = useState("");
 
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  /* -------------------------
-     FILTER STATE (URL DRIVEN)
-  ------------------------- */
   const search = searchParams.get("search") || "";
   const positionFilter = searchParams.get("position") || "all";
-  const teamFilter = searchParams.get("team") || "all";
 
   /* -------------------------
      LOAD DATA
   ------------------------- */
-  async function loadData() {
+  const loadData = useCallback(async () => {
+    console.log("🔄 FETCHING PLAYERS...");
+
     const params = new URLSearchParams(searchParams.toString());
 
-    const p = await fetch(
+    const res = await fetch(
       `/api/admin/players?${params.toString()}`
-    ).then((r) => r.json());
-
-    const t = await fetch("/api/admin/teams/list").then((r) =>
-      r.json()
     );
 
-    setPlayers(p);
-    setTeams(t);
-  }
+    const data = await res.json();
+
+    console.log("📦 PLAYERS RESPONSE:", data);
+
+    setPlayers(data);
+  }, [searchParams]);
 
   useEffect(() => {
-    loadData();
-  }, [searchParams]);
+  async function init() {
+    await loadData();
+  }
+
+  init();
+}, [loadData]);
 
   /* -------------------------
      SEARCH
@@ -70,15 +85,14 @@ export default function AdminPlayers() {
   function updateSearch(value: string) {
     const params = new URLSearchParams(searchParams.toString());
 
-    value
-      ? params.set("search", value)
-      : params.delete("search");
+    if (value) params.set("search", value);
+    else params.delete("search");
 
     router.push(`/admin/players?${params.toString()}`);
   }
 
   /* -------------------------
-     POSITION FILTER
+     FILTER (preferred_position ONLY)
   ------------------------- */
   function updatePositionFilter(value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -95,43 +109,43 @@ export default function AdminPlayers() {
   }
 
   /* -------------------------
-     TEAM FILTER
-  ------------------------- */
-  function updateTeamFilter(value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-
-    value !== "all"
-      ? params.set("team", value)
-      : params.delete("team");
-
-    router.push(`/admin/players?${params.toString()}`);
-  }
-
-  /* -------------------------
-     OPEN DRAWER (EDIT)
+     EDIT
   ------------------------- */
   function handleRowClick(p: Player) {
+    console.log("👤 EDIT PLAYER:", p);
+
     setSelectedPlayer(p);
     setFirstName(p.first_name);
     setLastName(p.last_name);
     setParentEmail(p.parent_email || "");
-    setTeamId(p.team_id || "none");
-    setPosition(p.position || "");
+
+    setDob(
+      p.date_of_birth
+        ? new Date(p.date_of_birth).toISOString().split("T")[0]
+        : ""
+    );
+
+    /* ✅ ONLY SOURCE */
+    setPreferredPosition(p.preferred_position || "");
+
     setOpen(true);
   }
 
   /* -------------------------
-     CRUD
+     CREATE
   ------------------------- */
   async function createPlayer() {
+    console.log("➕ CREATING PLAYER");
+
     await fetch("/api/admin/players/create", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         first_name: firstName,
         last_name: lastName,
-        parent_email: parentEmail,
-        team_id: teamId === "none" ? null : teamId,
-        position,
+        parent_email: parentEmail || null,
+        date_of_birth: dob || null,
+        preferred_position: preferredPosition || null,
       }),
     });
 
@@ -140,16 +154,22 @@ export default function AdminPlayers() {
     loadData();
   }
 
+  /* -------------------------
+     UPDATE
+  ------------------------- */
   async function updatePlayer() {
+    console.log("✏️ UPDATING PLAYER:", selectedPlayer?.id);
+
     await fetch("/api/admin/players/update", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: selectedPlayer?.id,
         first_name: firstName,
         last_name: lastName,
-        parent_email: parentEmail,
-        team_id: teamId === "none" ? null : teamId,
-        position,
+        parent_email: parentEmail || null,
+        date_of_birth: dob || null,
+        preferred_position: preferredPosition || null,
       }),
     });
 
@@ -158,9 +178,14 @@ export default function AdminPlayers() {
     loadData();
   }
 
+  /* -------------------------
+     DELETE
+  ------------------------- */
   async function deletePlayer(p: Player) {
     const ok = confirm(`Delete ${p.first_name}?`);
     if (!ok) return;
+
+    console.log("🗑️ DELETING PLAYER:", p.id);
 
     await fetch("/api/admin/players/delete", {
       method: "POST",
@@ -175,13 +200,16 @@ export default function AdminPlayers() {
     loadData();
   }
 
+  /* -------------------------
+     RESET
+  ------------------------- */
   function resetForm() {
     setSelectedPlayer(null);
     setFirstName("");
     setLastName("");
     setParentEmail("");
-    setTeamId("none");
-    setPosition("");
+    setDob("");
+    setPreferredPosition("");
   }
 
   return (
@@ -204,66 +232,103 @@ export default function AdminPlayers() {
             </button>
           </DrawerTrigger>
 
-          <DrawerContent className="p-6">
+          <DrawerContent className="p-6 overflow-visible">
             <DrawerHeader>
               <DrawerTitle>
                 {selectedPlayer ? "Edit Player" : "Add Player"}
               </DrawerTitle>
             </DrawerHeader>
 
-            <div className="space-y-4 mt-4">
-              <input
-                placeholder="First name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="border p-2 rounded w-full"
-              />
+            <div className="space-y-5 mt-4">
 
-              <input
-                placeholder="Last name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="border p-2 rounded w-full"
-              />
-
-              <div className="flex gap-2 flex-wrap">
-                {POSITIONS.map((pos) => (
-                  <button
-                    key={pos}
-                    type="button"
-                    onClick={() => setPosition(pos)}
-                    className={`px-3 py-1 rounded-full border ${
-                      position === pos
-                        ? "bg-black text-white"
-                        : "bg-white"
-                    }`}
-                  >
-                    {pos}
-                  </button>
-                ))}
+              {/* FIRST NAME */}
+              <div>
+                <label className="text-sm text-gray-600">First name</label>
+                <input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="border p-3 rounded w-full"
+                />
               </div>
 
-              <select
-                value={teamId}
-                onChange={(e) => setTeamId(e.target.value)}
-                className="border p-2 rounded w-full"
-              >
-                <option value="none">No team</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.display_name}
-                  </option>
-                ))}
-              </select>
+              {/* LAST NAME */}
+              <div>
+                <label className="text-sm text-gray-600">Last name</label>
+                <input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="border p-3 rounded w-full"
+                />
+              </div>
 
-              <input
-                placeholder="Parent email"
-                value={parentEmail}
-                onChange={(e) =>
-                  setParentEmail(e.target.value)
-                }
-                className="border p-2 rounded w-full"
-              />
+              {/* DOB */}
+              <div>
+                <label className="text-sm text-gray-600">Date of birth</label>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="border p-3 rounded w-full flex justify-between"
+                    >
+                      {dob ? format(new Date(dob), "PPP") : "Select date"}
+                      <CalendarIcon className="h-4 w-4 opacity-50" />
+                    </button>
+                  </PopoverTrigger>
+
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dob ? new Date(dob) : undefined}
+                      onSelect={(date) => {
+                        if (!date) return;
+                        setDob(date.toISOString().split("T")[0]);
+                      }}
+                      captionLayout="dropdown"
+                      fromYear={1990}
+                      toYear={new Date().getFullYear()}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* ✅ ONLY POSITION FIELD */}
+              <div>
+                <label className="text-sm text-gray-600">
+                  Preferred position
+                </label>
+
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {POSITIONS.map((pos) => (
+                    <button
+                      key={pos}
+                      type="button"
+                      onClick={() => setPreferredPosition(pos)}
+                      className={`px-3 py-1 rounded text-sm border ${
+                        preferredPosition === pos
+                          ? "bg-black text-white"
+                          : "bg-white"
+                      }`}
+                    >
+                      {pos}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* EMAIL */}
+              <div>
+                <label className="text-sm text-gray-600">
+                  Parent email
+                </label>
+                <input
+                  value={parentEmail}
+                  onChange={(e) => setParentEmail(e.target.value)}
+                  className="border p-3 rounded w-full"
+                />
+              </div>
+
             </div>
 
             <DrawerFooter className="mt-6 space-y-2">
@@ -291,34 +356,20 @@ export default function AdminPlayers() {
                 </button>
               </DrawerClose>
             </DrawerFooter>
+
           </DrawerContent>
         </Drawer>
       </div>
 
-      {/* SEARCH + TEAM */}
-      <div className="flex gap-3 items-center">
-        <input
-          placeholder="Search players..."
-          defaultValue={search}
-          onChange={(e) => updateSearch(e.target.value)}
-          className="border p-2 rounded w-[250px]"
-        />
+      {/* SEARCH */}
+      <input
+        placeholder="Search players..."
+        defaultValue={search}
+        onChange={(e) => updateSearch(e.target.value)}
+        className="border p-2 rounded w-[250px]"
+      />
 
-        <select
-          value={teamFilter}
-          onChange={(e) => updateTeamFilter(e.target.value)}
-          className="border p-2 rounded"
-        >
-          <option value="all">All teams</option>
-          {teams.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.display_name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* POSITION FILTER */}
+      {/* FILTER */}
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => updatePositionFilter("all")}

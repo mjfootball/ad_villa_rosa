@@ -4,6 +4,12 @@ import { supabaseService } from "@/lib/supabase/service";
 export async function GET() {
   const supabase = supabaseService();
 
+  console.log("🔥 ===============================");
+  console.log("🔥 FETCH TEAMS START");
+
+  /* -------------------------
+     FETCH FROM DB
+  ------------------------- */
   const { data, error } = await supabase
     .from("teams")
     .select(`
@@ -18,18 +24,36 @@ export async function GET() {
     .order("display_name");
 
   if (error) {
-    console.error("Teams fetch error:", error);
+    console.error("❌ TEAMS FETCH ERROR:", error);
     return NextResponse.json(null, { status: 500 });
   }
 
-  // ✅ format data for frontend
-  const formatted = data.map((t: any) => ({
-    id: t.id,
-    display_name: t.display_name,
-    team_name: t.team_name,
-    format: t.format,
-    age_group_name: t.age_group?.name_es || null,
-  }));
+  console.log("📦 RAW TEAMS DATA:", data);
+
+  if (!data || data.length === 0) {
+    console.warn("⚠️ NO TEAMS FOUND IN DATABASE");
+  }
+
+  /* -------------------------
+     FORMAT DATA
+  ------------------------- */
+  const formatted = data.map((t: any) => {
+    const formattedTeam = {
+      id: t.id,
+      display_name: t.display_name,
+      team_name: t.team_name,
+      format: t.format,
+      age_group_name: t.age_group?.name_es || null,
+    };
+
+    console.log("🔄 FORMATTED TEAM:", formattedTeam);
+
+    return formattedTeam;
+  });
+
+  console.log("✅ FINAL TEAMS RESPONSE:", formatted);
+  console.log("🔥 FETCH TEAMS COMPLETE");
+  console.log("🔥 ===============================");
 
   return NextResponse.json(formatted);
 }

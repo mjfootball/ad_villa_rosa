@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-type Team = {
-  id: string;
-  display_name: string;
-};
+import type { Team } from "@/types/team";
 
 export default function BillingPage() {
   const [teams, setTeams] = useState<Team[]>([]);

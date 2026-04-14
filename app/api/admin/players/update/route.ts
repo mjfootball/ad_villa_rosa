@@ -1,108 +1,217 @@
 import { NextResponse } from "next/server";
 import { supabaseService } from "@/lib/supabase/service";
 
+/* -------------------------
+   TYPES
+------------------------- */
+type UpdatePlayerBody = {
+  id: string;
+
+  first_name?: string | null;
+  last_name?: string | null;
+  parent_email?: string | null;
+
+  preferred_position?: string | null;
+  secondary_position?: string | null;
+
+  preferred_foot?: string | null;
+
+  height_cm?: number | string | null;
+  strengths?: string | null;
+  development_notes?: string | null;
+  injured?: boolean | null;
+
+  date_of_birth?: string | null;
+  date_joined?: string | null;
+
+  notes?: string | null;
+  medical_notes?: string | null;
+
+  avatar_url?: string | null;
+
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+};
+
+/* 🔥 PARTIAL TYPE (KEY FIX) */
+type UpdateData = Partial<{
+  first_name: string | null;
+  last_name: string | null;
+  parent_email: string | null;
+
+  preferred_position: string | null;
+  secondary_position: string | null;
+
+  preferred_foot: string | null;
+
+  height_cm: number | null;
+  strengths: string | null;
+  development_notes: string | null;
+  injured: boolean;
+
+  date_of_birth: string | null;
+  date_joined: string | null;
+
+  notes: string | null;
+  medical_notes: string | null;
+
+  avatar_url: string | null;
+
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+}>;
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    console.log("🔥 ===============================");
+    console.log("🔥 UPDATE PLAYER START");
 
-    const {
-      id,
-      first_name,
-      last_name,
-      parent_email,
-      team_id,
-      position,
-      date_of_birth,
-      notes,
-      medical_notes,
-      avatar_url,
-      emergency_contact_name,
-      emergency_contact_phone,
-    } = body;
+    const body: UpdatePlayerBody = await req.json();
+    console.log("📦 RAW REQUEST BODY:", body);
+
+    const { id } = body;
 
     if (!id) {
-      return NextResponse.json(
-        { error: "Missing player ID" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing ID" }, { status: 400 });
     }
 
     const supabase = supabaseService();
 
     /* -------------------------
-       CLEAN EMAIL
+       CONSTANTS
     ------------------------- */
-    const cleanEmail = parent_email
-      ? parent_email.toLowerCase().trim()
-      : null;
+    const validFeet = ["Left", "Right", "Both"];
+
+    const validPositions = [
+      "GK",
+      "RB", "CB", "LB",
+      "CDM", "CM", "CAM",
+      "RW", "LW", "ST",
+    ];
 
     /* -------------------------
-       BUILD SAFE UPDATE OBJECT
+       HELPERS
     ------------------------- */
-    const updateData: any = {
-      first_name,
-      last_name,
-      parent_email: cleanEmail,
-      position,
-      date_of_birth: date_of_birth
-        ? new Date(date_of_birth).toISOString().split("T")[0]
-        : null,
-      notes,
-      medical_notes,
-      avatar_url,
-      emergency_contact_name,
-      emergency_contact_phone,
+    const cleanString = (value?: string | null) => {
+      if (value === undefined || value === null) return null;
+      const trimmed = value.trim();
+      return trimmed === "" ? null : trimmed;
     };
 
-    // ✅ REMOVE undefined fields (CRITICAL)
-    Object.keys(updateData).forEach((key) => {
-      if (updateData[key] === undefined) {
-        delete updateData[key];
+    const formatDate = (d?: string | null) => {
+      if (!d) return null;
+      try {
+        return new Date(d).toISOString().split("T")[0];
+      } catch {
+        return null;
       }
-    });
+    };
+
+    const cleanEmail = (email?: string | null) => {
+      if (!email) return null;
+      return email.toLowerCase().trim();
+    };
+
+    const cleanPosition = (value?: string | null) => {
+      const cleaned = cleanString(value);
+      if (!cleaned) return null;
+
+      const upper = cleaned.toUpperCase();
+      return validPositions.includes(upper) ? upper : null;
+    };
+
+    const cleanFoot = (value?: string | null) => {
+      const cleaned = cleanString(value);
+      if (!cleaned) return null;
+
+      const normalised =
+        cleaned.charAt(0).toUpperCase() +
+        cleaned.slice(1).toLowerCase();
+
+      return validFeet.includes(normalised) ? normalised : null;
+    };
 
     /* -------------------------
-       UPDATE PLAYER
+       BUILD UPDATE OBJECT (SAFE)
     ------------------------- */
-    const { error: playerError } = await supabase
+    const updateData: UpdateData = {};
+
+    if ("first_name" in body)
+      updateData.first_name = cleanString(body.first_name);
+
+    if ("last_name" in body)
+      updateData.last_name = cleanString(body.last_name);
+
+    if ("parent_email" in body)
+      updateData.parent_email = cleanEmail(body.parent_email);
+
+    if ("preferred_position" in body)
+      updateData.preferred_position = cleanPosition(body.preferred_position);
+
+    if ("secondary_position" in body)
+      updateData.secondary_position = cleanPosition(body.secondary_position);
+
+    if ("preferred_foot" in body)
+      updateData.preferred_foot = cleanFoot(body.preferred_foot);
+
+    if ("height_cm" in body)
+      updateData.height_cm = body.height_cm
+        ? Number(body.height_cm)
+        : null;
+
+    if ("strengths" in body)
+      updateData.strengths = cleanString(body.strengths);
+
+    if ("development_notes" in body)
+      updateData.development_notes = cleanString(body.development_notes);
+
+    if ("injured" in body)
+      updateData.injured = body.injured ?? false;
+
+    if ("date_of_birth" in body)
+      updateData.date_of_birth = formatDate(body.date_of_birth);
+
+    if ("date_joined" in body)
+      updateData.date_joined = formatDate(body.date_joined);
+
+    if ("notes" in body)
+      updateData.notes = cleanString(body.notes);
+
+    if ("medical_notes" in body)
+      updateData.medical_notes = cleanString(body.medical_notes);
+
+    /* 🔥 CRITICAL FIX */
+    if ("avatar_url" in body)
+      updateData.avatar_url = cleanString(body.avatar_url);
+
+    if ("emergency_contact_name" in body)
+      updateData.emergency_contact_name = cleanString(body.emergency_contact_name);
+
+    if ("emergency_contact_phone" in body)
+      updateData.emergency_contact_phone = cleanString(body.emergency_contact_phone);
+
+    console.log("🧠 FINAL SAFE UPDATE:", updateData);
+
+    /* -------------------------
+       UPDATE
+    ------------------------- */
+    const { data, error } = await supabase
       .from("players")
       .update(updateData)
-      .eq("id", id);
+      .eq("id", id)
+      .select();
 
-    if (playerError) {
-      console.error("❌ player update failed", playerError);
-      return NextResponse.json(
-        { error: "Player update failed" },
-        { status: 500 }
-      );
+    if (error) {
+      console.error("❌ PLAYER UPDATE FAILED:", error);
+      return NextResponse.json({ error }, { status: 500 });
     }
 
-    /* -------------------------
-       TEAM UPDATE (ONLY IF SENT)
-    ------------------------- */
-    if (team_id !== undefined) {
-      // delete existing
-      await supabase
-        .from("player_team")
-        .delete()
-        .eq("player_id", id);
+    console.log("✅ PLAYER UPDATED SUCCESSFULLY");
 
-      // insert new
-      if (team_id) {
-        await supabase.from("player_team").insert({
-          player_id: id,
-          team_id,
-        });
-      }
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, data });
 
   } catch (err) {
-    console.error("❌ server error", err);
-    return NextResponse.json(
-      { error: "Server error" },
-      { status: 500 }
-    );
+    console.error("❌ SERVER ERROR:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

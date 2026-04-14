@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-
+import Image from "next/image";
+import { UserCog } from "lucide-react"; //
 import {
   Sidebar,
   SidebarContent,
@@ -12,6 +13,8 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  SidebarTrigger, // 🔥 ADD THIS
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 import {
@@ -19,6 +22,8 @@ import {
   Layers,
   CreditCard,
   Euro,
+  FileText,
+  Settings,
   LogOut,
 } from "lucide-react";
 
@@ -29,27 +34,29 @@ export function AppSidebar() {
   const router = useRouter();
   const supabase = supabaseBrowser();
 
-  const items = [
-    {
-      title: "Players",
-      url: "/admin/players",
-      icon: Users,
-    },
-    {
-      title: "Teams",
-      url: "/admin/teams",
-      icon: Layers,
-    },
-    {
-      title: "Billing",
-      url: "/admin/billing",
-      icon: CreditCard,
-    },
-    {
-      title: "Payments",
-      url: "/admin/payments",
-      icon: Euro,
-    },
+  const { setOpen } = useSidebar();
+
+  /* -------------------------
+     NAV GROUPS
+  ------------------------- */
+
+  const coreItems = [
+  { title: "Players", url: "/admin/players", icon: Users },
+  { title: "Teams", url: "/admin/teams", icon: Layers },
+
+  
+  { title: "Staff", url: "/admin/staff", icon: UserCog },
+
+  { title: "Billing", url: "/admin/billing", icon: CreditCard },
+  { title: "Payments", url: "/admin/payments", icon: Euro },
+];
+
+  const contentItems = [
+    { title: "Posts", url: "/admin/posts", icon: FileText },
+  ];
+
+  const systemItems = [
+    { title: "Settings", url: "/admin/settings", icon: Settings },
   ];
 
   /* -------------------------
@@ -60,22 +67,53 @@ export function AppSidebar() {
     router.push("/sign-in");
   }
 
+  /* -------------------------
+     LINK CLICK
+  ------------------------- */
+  function handleLinkClick() {
+    setOpen(false); // collapse on navigation
+  }
+
   return (
     <Sidebar collapsible="icon">
 
-      {/* MAIN NAV */}
+      {/* 🔥 TOP BAR (LOGO + TOGGLE) */}
+      <div className="p-4 border-b flex items-center justify-between">
+
+        <div className="flex items-center gap-3">
+          <Image
+            src="/images/logo.png"
+            alt="MJ Football"
+            width={400}
+            height={160}
+            className="h-12 w-auto"
+            priority
+          />
+        </div>
+
+        {/* 🔥 THIS FIXES YOUR ISSUE */}
+        <SidebarTrigger />
+
+      </div>
+
       <SidebarContent>
+
+        {/* CORE */}
         <SidebarGroup>
-          <SidebarGroupLabel>Admin</SidebarGroupLabel>
+          <SidebarGroupLabel>Academy</SidebarGroupLabel>
 
           <SidebarMenu>
-            {items.map((item) => {
-              const isActive = pathname === item.url;
+            {coreItems.map((item) => {
+              const isActive = pathname.startsWith(item.url);
 
               return (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive}>
-                    <Link href={item.url}>
+                    <Link
+                      href={item.url}
+                      onClick={handleLinkClick}
+                      className="flex items-center gap-2 w-full"
+                    >
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
@@ -84,13 +122,64 @@ export function AppSidebar() {
               );
             })}
           </SidebarMenu>
-
         </SidebarGroup>
+
+        {/* CONTENT */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Content</SidebarGroupLabel>
+
+          <SidebarMenu>
+            {contentItems.map((item) => {
+              const isActive = pathname.startsWith(item.url);
+
+              return (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={isActive}>
+                    <Link
+                      href={item.url}
+                      onClick={handleLinkClick}
+                      className="flex items-center gap-2 w-full"
+                    >
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* SYSTEM */}
+        <SidebarGroup>
+          <SidebarGroupLabel>System</SidebarGroupLabel>
+
+          <SidebarMenu>
+            {systemItems.map((item) => {
+              const isActive = pathname.startsWith(item.url);
+
+              return (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={isActive}>
+                    <Link
+                      href={item.url}
+                      onClick={handleLinkClick}
+                      className="flex items-center gap-2 w-full"
+                    >
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
+
       </SidebarContent>
 
-      {/* 🔥 FOOTER (BOTTOM LEFT LOGOUT) */}
+      {/* FOOTER */}
       <SidebarFooter>
-
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -102,7 +191,6 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-
       </SidebarFooter>
 
     </Sidebar>

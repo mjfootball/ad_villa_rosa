@@ -1,27 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-type Team = {
-  id: string;
-  display_name: string;
-};
+/* ✅ POSITION OPTIONS */
+const POSITIONS = [
+  "GK",
+  "RB",
+  "CB",
+  "LB",
+  "CDM",
+  "CM",
+  "CAM",
+  "RW",
+  "LW",
+  "ST",
+];
 
 export default function AddPlayerAdmin() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [parentEmail, setParentEmail] = useState("");
-  const [teamId, setTeamId] = useState("");
-  const [position, setPosition] = useState(""); // ✅ NEW
+  const [dob, setDob] = useState("");
+  const [preferredPosition, setPreferredPosition] = useState("");
 
-  const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/admin/teams/list")
-      .then((res) => res.json())
-      .then(setTeams);
-  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,9 +37,9 @@ export default function AddPlayerAdmin() {
       body: JSON.stringify({
         first_name: firstName,
         last_name: lastName,
-        parent_email: parentEmail,
-        team_id: teamId || null,
-        position, // ✅ NEW
+        parent_email: parentEmail || null,
+        date_of_birth: dob || null,
+        preferred_position: preferredPosition || null,
       }),
     });
 
@@ -49,69 +51,89 @@ export default function AddPlayerAdmin() {
 
     alert("Player created ✅");
 
-    // ✅ reset form
     setFirstName("");
     setLastName("");
     setParentEmail("");
-    setTeamId("");
-    setPosition(""); // ✅ NEW
+    setDob("");
+    setPreferredPosition("");
 
     setLoading(false);
   }
 
   return (
     <div className="max-w-md mx-auto mt-20 space-y-6">
-      <h1 className="text-2xl font-semibold">Add Player (Admin)</h1>
+      <h1 className="text-2xl font-semibold">Add Player</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        
+      <form onSubmit={handleSubmit} className="space-y-5">
+
         {/* FIRST NAME */}
-        <input
-          placeholder="First name"
-          className="border p-3 w-full rounded"
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-          required
-        />
+        <div>
+          <label className="text-sm text-gray-600">First name</label>
+          <input
+            className="border p-3 w-full rounded"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+          />
+        </div>
 
         {/* LAST NAME */}
-        <input
-          placeholder="Last name"
-          className="border p-3 w-full rounded"
-          value={lastName}
-          onChange={(e) => setLastName(e.target.value)}
-          required
-        />
+        <div>
+          <label className="text-sm text-gray-600">Last name</label>
+          <input
+            className="border p-3 w-full rounded"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            required
+          />
+        </div>
 
-        {/* POSITION (NEW) */}
-        <input
-          placeholder="Position (e.g. CM, GK)"
-          className="border p-3 w-full rounded"
-          value={position}
-          onChange={(e) => setPosition(e.target.value)}
-        />
+        {/* DOB */}
+        <div>
+          <label className="text-sm text-gray-600">Date of birth</label>
+          <input
+            type="date"
+            className="border p-3 w-full rounded"
+            value={dob || ""}
+            onChange={(e) => setDob(e.target.value)}
+          />
+        </div>
 
-        {/* PARENT EMAIL */}
-        <input
-          placeholder="Parent email"
-          className="border p-3 w-full rounded"
-          value={parentEmail}
-          onChange={(e) => setParentEmail(e.target.value)}
-        />
+        {/* PREFERRED POSITION (CHIPS) */}
+        <div>
+          <label className="text-sm text-gray-600">
+            Preferred position
+          </label>
 
-        {/* TEAM SELECT */}
-        <select
-          className="border p-3 w-full rounded"
-          value={teamId}
-          onChange={(e) => setTeamId(e.target.value)}
-        >
-          <option value="">No team</option>
-          {teams.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.display_name}
-            </option>
-          ))}
-        </select>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {POSITIONS.map((pos) => (
+              <button
+                key={pos}
+                type="button"
+                onClick={() => setPreferredPosition(pos)}
+                className={`px-3 py-1 rounded text-sm border ${
+                  preferredPosition === pos
+                    ? "bg-black text-white"
+                    : "bg-white"
+                }`}
+              >
+                {pos}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* EMAIL */}
+        <div>
+          <label className="text-sm text-gray-600">
+            Parent email (optional)
+          </label>
+          <input
+            className="border p-3 w-full rounded"
+            value={parentEmail}
+            onChange={(e) => setParentEmail(e.target.value)}
+          />
+        </div>
 
         {/* SUBMIT */}
         <button

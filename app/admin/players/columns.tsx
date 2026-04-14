@@ -12,17 +12,66 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+/* -------------------------
+   TYPES
+------------------------- */
 export type Player = {
   id: string;
   first_name: string;
   last_name: string;
   parent_email?: string | null;
-  position?: string | null;
+
+  // ✅ NEW MODEL
+  preferred_position?: string | null;
+  date_of_birth?: string | null;
+
   team_name?: string | null;
+  avatar_url?: string | null;
 };
 
+/* -------------------------
+   HELPERS
+------------------------- */
+function getAge(dob?: string | null) {
+  if (!dob) return null;
+
+  const birth = new Date(dob);
+  const today = new Date();
+
+  let age = today.getFullYear() - birth.getFullYear();
+
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+
+  return age;
+}
+
+function getCategory(age: number | null) {
+  if (age === null) return null;
+
+  if (age <= 6) return "U7";
+  if (age <= 7) return "U8";
+  if (age <= 8) return "U9";
+  if (age <= 9) return "U10";
+  if (age <= 10) return "U11";
+  if (age <= 11) return "U12";
+  if (age <= 12) return "U13";
+  if (age <= 13) return "U14";
+  if (age <= 14) return "U15";
+  if (age <= 15) return "U16";
+  if (age <= 16) return "U17";
+  if (age <= 17) return "U18";
+
+  return "Senior";
+}
+
+/* -------------------------
+   COLUMNS
+------------------------- */
 export const columns = (
-  onEdit: (p: Player) => void, // still passed for row click usage
+  onEdit: (p: Player) => void,
   onDelete: (p: Player) => void
 ): ColumnDef<Player>[] => [
   {
@@ -30,33 +79,95 @@ export const columns = (
     header: "Player",
     cell: ({ row }) => {
       const p = row.original;
-      return `${p.first_name} ${p.last_name}`;
-    },
-  },
-  {
-    accessorKey: "position",
-    header: "Position",
-    cell: ({ row }) => {
-      const pos = row.original.position;
-      return pos ? (
-        <span className="px-2 py-1 rounded bg-gray-100 text-xs">
-          {pos}
-        </span>
-      ) : (
-        "—"
+
+      const age = getAge(p.date_of_birth);
+      const category = getCategory(age);
+
+      return (
+        <div className="flex items-center gap-3">
+
+          {/* AVATAR */}
+          <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center text-xs font-medium">
+            {p.avatar_url ? (
+              <img
+                src={p.avatar_url}
+                alt="avatar"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span>
+                {p.first_name?.[0]}
+                {p.last_name?.[0]}
+              </span>
+            )}
+          </div>
+
+          {/* NAME + META */}
+          <div className="flex flex-col leading-tight">
+
+            <span className="font-medium">
+              {p.first_name} {p.last_name}
+            </span>
+
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+
+              {/* AGE */}
+              {age !== null && (
+                <span>Age {age}</span>
+              )}
+
+              {/* CATEGORY */}
+              {category && (
+                <span className="px-1.5 py-0.5 bg-gray-100 rounded">
+                  {category}
+                </span>
+              )}
+
+              {/* POSITION */}
+              {p.preferred_position && (
+                <span className="px-1.5 py-0.5 bg-black text-white rounded">
+                  {p.preferred_position}
+                </span>
+              )}
+
+            </div>
+
+          </div>
+
+        </div>
       );
     },
   },
+
   {
     accessorKey: "team_name",
     header: "Team",
+    cell: ({ row }) => {
+      const team = row.original.team_name;
+
+      return team ? (
+        <span>{team}</span>
+      ) : (
+        <span className="text-gray-400 text-sm">Unassigned</span>
+      );
+    },
   },
+
   {
     accessorKey: "parent_email",
     header: "Email",
+    cell: ({ row }) => {
+      const email = row.original.parent_email;
+
+      return email ? (
+        <span>{email}</span>
+      ) : (
+        <span className="text-gray-400 text-sm">—</span>
+      );
+    },
   },
 
-  /* 🔥 ACTIONS DROPDOWN (FINAL CLEAN VERSION) */
+  /* ACTIONS */
   {
     id: "actions",
     cell: ({ row }) => {
@@ -76,7 +187,6 @@ export const columns = (
 
           <DropdownMenuContent align="end">
 
-            {/* VIEW PROFILE */}
             <DropdownMenuItem asChild>
               <Link
                 href={`/admin/players/${p.id}`}
@@ -86,7 +196,6 @@ export const columns = (
               </Link>
             </DropdownMenuItem>
 
-            {/* DELETE */}
             <DropdownMenuItem
               className="text-red-600"
               onClick={(e) => {
