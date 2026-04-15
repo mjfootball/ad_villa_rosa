@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
 import "./globals.css";
-import Image from "next/image";
+
+import Navbar from "@/components/Navbar"; // ✅ NEW
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,38 +32,8 @@ export default function RootLayout({
     >
       <body className="min-h-screen flex flex-col bg-background text-foreground">
 
-        {/* 🔥 NAVBAR */}
-        <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-50">
-          <div className="container flex items-center justify-between h-16">
-
-            {/* ✅ LOGO */}
-            <Link href="/" className="flex items-center gap-3">
-  <Image
-  src="/images/logo.png"
-  alt="MJ Football"
-  width={400}
-  height={160}
-  className="h-16 w-auto"
-  priority
-/>
-  
-</Link>
-
-            {/* NAV */}
-            <nav className="flex items-center gap-6 text-sm">
-              <Link href="/news">News</Link>
-              <Link href="/contact">Contact</Link>
-
-              <Link
-                href="/sign-in"
-                className="border px-4 py-1.5 rounded-md"
-              >
-                Sign In
-              </Link>
-            </nav>
-
-          </div>
-        </header>
+        {/* ✅ CONTROLLED NAVBAR */}
+        <Navbar />
 
         {/* PAGE */}
         <main className="flex-1">

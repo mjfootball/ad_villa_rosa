@@ -8,7 +8,8 @@ export type Team = {
 
   age_group_name?: string | null;
 
-  // 🔥 future-ready (no need to use yet)
+  head_coach?: string; // ✅ ADD THIS
+
   team_staff?: {
     staff_id: string;
     role?: string | null;

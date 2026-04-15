@@ -7,7 +7,7 @@ export async function POST(req: Request) {
   const supabase = supabaseService();
 
   /* -------------------------
-     PARSE BODY (JSON)
+     PARSE BODY
   ------------------------- */
   const body = await req.json();
 
@@ -15,7 +15,8 @@ export async function POST(req: Request) {
     first_name,
     last_name,
     email,
-    system_role, // ✅ NEW (optional from UI later)
+    system_role,
+    avatar_url, // ✅ NEW
   } = body;
 
   console.log("📦 DATA:", body);
@@ -37,12 +38,13 @@ export async function POST(req: Request) {
     .from("staff")
     .insert([
       {
-        first_name,
-        last_name,
-        email: email || null,
+        first_name: first_name.trim(),
+        last_name: last_name.trim(),
 
-        // ✅ IMPORTANT
+        email: email || null,
         system_role: system_role || "coach",
+
+        avatar_url: avatar_url || null, 
       },
     ])
     .select()
@@ -59,9 +61,6 @@ export async function POST(req: Request) {
 
   console.log("✅ STAFF CREATED:", data);
 
-  /* -------------------------
-     RESPONSE
-  ------------------------- */
   return NextResponse.json({
     success: true,
     staff: data,

@@ -13,7 +13,8 @@ export async function GET() {
       first_name,
       last_name,
       email,
-      system_role
+      system_role,
+      avatar_url   
     `)
     .order("first_name");
 

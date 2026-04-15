@@ -4,24 +4,61 @@ import { useEffect, useState } from "react";
 import type { Player } from "@/types/player";
 import type { Team } from "@/types/team";
 
+/* -------------------------
+   TYPES
+------------------------- */
 type SavedRow = {
   slot: string;
   player_id: string;
+};
+
+type Staff = {
+  staff_id: string;
+  first_name: string;
+  last_name: string;
+  role?: string | null;
+};
+
+type StaffListItem = {
+  id: string;
+  first_name: string;
+  last_name: string;
 };
 
 type Slots = Record<string, Player | null>;
 
 export default function TeamClient({
   team,
+  staff,
   players,
   savedLineup,
 }: {
   team: Team;
+  staff: Staff[];
   players: Player[];
   savedLineup: SavedRow[];
 }) {
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [slots, setSlots] = useState<Slots>({});
+
+  /* -------------------------
+     STAFF STATE
+  ------------------------- */
+  const [teamStaff, setTeamStaff] = useState<Staff[]>(staff || []);
+  const [staffList, setStaffList] = useState<StaffListItem[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [selectedRole, setSelectedRole] = useState("Head Coach");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  /* -------------------------
+     DUPLICATE CHECK
+  ------------------------- */
+  function isDuplicate(staffId: string, role: string) {
+    return teamStaff.some(
+      (s) => s.staff_id === staffId && s.role === role
+    );
+  }
 
   /* -------------------------
      FORMATION
@@ -42,29 +79,112 @@ export default function TeamClient({
         ];
 
   /* -------------------------
-     HYDRATE FROM DB
+     HYDRATE LINEUP
   ------------------------- */
   useEffect(() => {
-  async function hydrate() {
-    console.log("🔄 HYDRATING LINEUP");
-
     const mapped: Slots = {};
 
     savedLineup.forEach((row) => {
-      const player = players.find(p => p.id === row.player_id);
+      const player = players.find((p) => p.id === row.player_id);
       if (player) mapped[row.slot] = player;
     });
 
-    console.log("✅ HYDRATED:", mapped);
-
     setSlots(mapped);
-  }
-
-  hydrate();
-}, [savedLineup, players]);
+  }, [savedLineup, players]);
 
   /* -------------------------
-     ASSIGN
+     LOAD STAFF LIST
+  ------------------------- */
+  useEffect(() => {
+    async function loadStaff() {
+      const res = await fetch("/api/admin/staff/list");
+      const data: StaffListItem[] = await res.json();
+      setStaffList(data);
+    }
+
+    loadStaff();
+  }, []);
+
+  /* -------------------------
+     ASSIGN COACH
+  ------------------------- */
+  async function assignCoach() {
+    if (!selectedStaffId) return;
+
+    if (isDuplicate(selectedStaffId, selectedRole)) {
+      setMessage("Coach already has this role");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const res = await fetch("/api/admin/teams/assign-staff", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          team_id: team.id,
+          staff_id: selectedStaffId,
+          role: selectedRole,
+        }),
+      });
+
+      if (!res.ok) {
+        setMessage("Failed to assign ❌");
+        return;
+      }
+
+      const selected = staffList.find(
+        (s) => s.id === selectedStaffId
+      );
+
+      if (!selected) return;
+
+      setTeamStaff((prev) => [
+        ...prev,
+        {
+          staff_id: selected.id,
+          first_name: selected.first_name,
+          last_name: selected.last_name,
+          role: selectedRole,
+        },
+      ]);
+
+      setSelectedStaffId("");
+      setMessage("Coach assigned ✅");
+
+    } catch {
+      setMessage("Error assigning coach ❌");
+    } finally {
+      setLoading(false);
+      setTimeout(() => setMessage(null), 2500);
+    }
+  }
+
+  /* -------------------------
+     REMOVE COACH
+  ------------------------- */
+  async function removeCoach(staff_id: string) {
+    await fetch("/api/admin/teams/remove-staff", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        team_id: team.id,
+        staff_id,
+      }),
+    });
+
+    setTeamStaff((prev) =>
+      prev.filter((s) => s.staff_id !== staff_id)
+    );
+  }
+
+  /* -------------------------
+     PLAYER ASSIGN
   ------------------------- */
   function assign(slot: string) {
     if (!selectedPlayer) return;
@@ -91,14 +211,12 @@ export default function TeamClient({
     .filter(Boolean)
     .map((p) => (p as Player).id);
 
-  const subs = players.filter(p => !assignedIds.includes(p.id));
+  const subs = players.filter((p) => !assignedIds.includes(p.id));
 
   /* -------------------------
-     SAVE
+     SAVE LINEUP
   ------------------------- */
   async function saveLineup() {
-    console.log("💾 SAVING LINEUP:", slots);
-
     await fetch("/api/admin/teams/save-lineup", {
       method: "POST",
       headers: {
@@ -115,9 +233,90 @@ export default function TeamClient({
     alert("Saved ✅");
   }
 
+  /* =========================
+     RENDER
+  ========================= */
   return (
     <div className="space-y-6">
 
+      {/* COACHING */}
+      <div className="border p-4 rounded-xl space-y-3">
+
+        <div className="flex justify-between items-center">
+          <h2 className="text-sm font-semibold">Coaching Staff</h2>
+
+          <div className="flex gap-2">
+            <select
+              value={selectedStaffId}
+              onChange={(e) => setSelectedStaffId(e.target.value)}
+              className="border p-2"
+            >
+              <option value="">Select coach</option>
+
+              {staffList.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.first_name} {s.last_name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="border p-2"
+            >
+              <option>Head Coach</option>
+              <option>Assistant</option>
+              <option>Coach</option>
+            </select>
+
+            <button
+              onClick={assignCoach}
+              disabled={
+                loading ||
+                !selectedStaffId ||
+                isDuplicate(selectedStaffId, selectedRole)
+              }
+              className="bg-black text-white px-3 py-2 rounded disabled:opacity-50"
+            >
+              {loading ? "..." : "Assign"}
+            </button>
+          </div>
+        </div>
+
+        {message && (
+          <div className="text-sm text-gray-600">{message}</div>
+        )}
+
+        {teamStaff.length > 0 ? (
+          teamStaff.map((s) => (
+            <div key={s.staff_id + s.role} className="flex justify-between">
+              <span>
+                {s.first_name} {s.last_name}
+              </span>
+
+              <div className="flex gap-3">
+                <span className="text-xs text-gray-500">
+                  {s.role}
+                </span>
+
+                <button
+                  onClick={() => removeCoach(s.staff_id)}
+                  className="text-red-500 text-xs"
+                >
+                  remove
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-gray-400 text-sm">
+            No coaches assigned
+          </p>
+        )}
+      </div>
+
+      {/* LINEUP */}
       <h2 className="text-xl font-semibold">
         Lineup ({team.format})
       </h2>
@@ -128,9 +327,7 @@ export default function TeamClient({
         </div>
       )}
 
-      {/* PITCH */}
       <div className="bg-green-100 p-6 rounded-xl space-y-6">
-
         {formation.map((row, i) => (
           <div key={i} className="flex justify-center gap-6">
             {row.map((slot) => (
@@ -144,7 +341,6 @@ export default function TeamClient({
             ))}
           </div>
         ))}
-
       </div>
 
       {/* SUBS */}
@@ -180,13 +376,12 @@ export default function TeamClient({
       >
         Save Lineup
       </button>
-
     </div>
   );
 }
 
 /* -------------------------
-   SLOT
+   SLOT COMPONENT (RESTORED)
 ------------------------- */
 function Slot({
   slot,

@@ -31,19 +31,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+/* -------------------------
+   TYPES
+------------------------- */
 type AgeGroup = {
   id: string;
   name_es: string;
 };
 
 export default function AdminTeams() {
-  const router = useRouter(); // ✅ ADD THIS
+  const router = useRouter();
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [ageGroups, setAgeGroups] = useState<AgeGroup[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Drawer form state
+  /* -------------------------
+     FORM STATE
+  ------------------------- */
   const [displayName, setDisplayName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [format, setFormat] = useState("F7");
@@ -53,20 +58,28 @@ export default function AdminTeams() {
      LOAD DATA
   ------------------------- */
   async function loadData() {
-    const teamsRes = await fetch("/api/admin/teams/list", {
-      cache: "no-store",
-    });
+    try {
+      setLoading(true);
 
-    const ageGroupsRes = await fetch("/api/admin/age-groups/list");
+      const teamsRes = await fetch("/api/admin/teams/list", {
+        cache: "no-store",
+      });
 
-    const teamsData = teamsRes.ok ? await teamsRes.json() : [];
-    const ageGroupsData = ageGroupsRes.ok
-      ? await ageGroupsRes.json()
-      : [];
+      const ageGroupsRes = await fetch("/api/admin/age-groups/list");
 
-    setTeams(teamsData);
-    setAgeGroups(ageGroupsData);
-    setLoading(false);
+      const teamsData = teamsRes.ok ? await teamsRes.json() : [];
+      const ageGroupsData = ageGroupsRes.ok
+        ? await ageGroupsRes.json()
+        : [];
+
+      setTeams(teamsData);
+      setAgeGroups(ageGroupsData);
+
+    } catch (err) {
+      console.error("❌ LOAD DATA ERROR:", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -95,16 +108,18 @@ export default function AdminTeams() {
       return;
     }
 
-    // reset
+    /* RESET */
     setDisplayName("");
     setTeamName("");
     setFormat("F7");
     setAgeGroupId("");
 
-    loadData();
+    await loadData();
   }
 
-  if (loading) return <div className="p-10">Loading teams...</div>;
+  if (loading) {
+    return <div className="p-10">Loading teams...</div>;
+  }
 
   return (
     <div className="p-10 space-y-6 max-w-6xl mx-auto">
@@ -113,7 +128,7 @@ export default function AdminTeams() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-semibold">Teams</h1>
 
-        {/* ➕ DRAWER */}
+        {/* ADD TEAM DRAWER */}
         <Drawer>
           <DrawerTrigger asChild>
             <button className="bg-black text-white px-4 py-2 rounded">
@@ -201,6 +216,7 @@ export default function AdminTeams() {
             <TableHead>Team</TableHead>
             <TableHead>Group</TableHead>
             <TableHead>Format</TableHead>
+            <TableHead>Head Coach</TableHead>
           </TableRow>
         </TableHeader>
 
@@ -208,16 +224,30 @@ export default function AdminTeams() {
           {teams.map((t) => (
             <TableRow
               key={t.id}
-              className="cursor-pointer hover:bg-muted" // ✅ UX
-              onClick={() => router.push(`/admin/teams/${t.id}`)} // ✅ NAVIGATION
+              className="cursor-pointer hover:bg-muted"
+              onClick={() => router.push(`/admin/teams/${t.id}`)}
             >
               <TableCell>{t.display_name}</TableCell>
-              <TableCell>{t.age_group_name || "—"}</TableCell>
+
+              <TableCell>
+                {t.age_group_name || "—"}
+              </TableCell>
+
               <TableCell>{t.format}</TableCell>
+
+              <TableCell>
+                {t.head_coach || (
+                  <span className="text-gray-400">
+                    Unassigned
+                  </span>
+                )}
+              </TableCell>
+
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
     </div>
   );
 }

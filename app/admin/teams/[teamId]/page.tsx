@@ -7,38 +7,84 @@ import TeamClient from "./team-client";
    TYPES
 ------------------------- */
 type Props = {
-  params: Promise<{ teamId: string }>; // ✅ FIX
+  params: Promise<{ teamId: string }>;
+};
+
+/* STAFF */
+type StaffRow = {
+  staff_id: string;
+  role: string | null;
+  staff: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  } | null;
+};
+
+/* ✅ FIXED PLAYER TYPE (OBJECT, NOT ARRAY) */
+type PlayerTeamRow = {
+  player: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    preferred_position?: string | null;
+    preferred_foot?: string | null;
+    created_at: string;
+  } | null;
 };
 
 export default async function TeamDetailPage({ params }: Props) {
   console.log("🔥 ===============================");
   console.log("🔥 TEAM DETAIL PAGE START");
 
-  const { teamId } = await params; // ✅ FIX
+  const { teamId } = await params;
 
   console.log("🆔 TEAM ID:", teamId);
 
   const supabase = await supabaseAuthServer();
 
   /* -------------------------
-     TEAM
+     TEAM + STAFF
   ------------------------- */
   const { data: team, error: teamError } = await supabase
     .from("teams")
-    .select("*")
+    .select(`
+      *,
+      team_staff (
+        staff_id,
+        role,
+        staff:staff (
+          id,
+          first_name,
+          last_name
+        )
+      )
+    `)
     .eq("id", teamId)
     .single();
 
-  console.log("📦 TEAM:", team);
-  console.log("❌ TEAM ERROR:", teamError);
-
   if (!team) {
-    console.error("❌ TEAM NOT FOUND");
+    console.error("❌ TEAM NOT FOUND", teamError);
     return notFound();
   }
 
+  console.log("📦 TEAM:", team);
+
   /* -------------------------
-     PLAYERS
+     NORMALISE STAFF
+  ------------------------- */
+  const staff =
+    (team.team_staff as StaffRow[] | null)?.map((s) => ({
+      staff_id: s.staff_id,
+      first_name: s.staff?.first_name || "",
+      last_name: s.staff?.last_name || "",
+      role: s.role,
+    })) || [];
+
+  console.log("👨‍🏫 STAFF:", staff);
+
+  /* -------------------------
+     PLAYERS (FIXED)
   ------------------------- */
   const { data: playersRaw, error: playersError } = await supabase
     .from("player_team")
@@ -58,32 +104,25 @@ export default async function TeamDetailPage({ params }: Props) {
     console.error("❌ PLAYERS FETCH ERROR:", playersError);
   }
 
-  console.log("👥 RAW PLAYERS:", playersRaw);
-
-  type PlayerRow = {
-    player: {
-      id: string;
-      first_name: string;
-      last_name: string;
-      preferred_position?: string | null;
-      preferred_foot?: string | null;
-      created_at: string;
-    };
-  };
+  console.log("📦 PLAYERS RAW:", playersRaw);
 
   const players =
-    playersRaw?.map((row: PlayerRow) => {
-      const p = row.player;
+    (playersRaw as PlayerTeamRow[] | null)
+      ?.map((row) => {
+        const p = row.player; // ✅ FIX HERE
 
-      return {
-        id: p.id,
-        first_name: p.first_name,
-        last_name: p.last_name,
-        preferred_position: p.preferred_position || null,
-        preferred_foot: p.preferred_foot || null,
-        created_at: p.created_at,
-      };
-    }) || [];
+        if (!p) return null;
+
+        return {
+          id: p.id,
+          first_name: p.first_name,
+          last_name: p.last_name,
+          preferred_position: p.preferred_position || null,
+          preferred_foot: p.preferred_foot || null,
+          created_at: p.created_at,
+        };
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null) || [];
 
   console.log("👥 FINAL PLAYERS:", players);
   console.log("📊 PLAYER COUNT:", players.length);
@@ -117,6 +156,7 @@ export default async function TeamDetailPage({ params }: Props) {
 
       <TeamClient
         team={team}
+        staff={staff}
         players={players}
         savedLineup={savedLineup || []}
       />

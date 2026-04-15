@@ -1,15 +1,34 @@
 import { NextResponse } from "next/server";
 import { supabaseService } from "@/lib/supabase/service";
 
+type StaffNested = {
+  first_name: string;
+  last_name: string;
+};
+
+type TeamStaffRow = {
+  role: string | null;
+  staff: StaffNested | null;
+};
+
+type AgeGroupRow = {
+  name_en: string;
+};
+
+type TeamRow = {
+  id: string;
+  display_name: string;
+  team_name: string;
+  format: "F7" | "F11";
+  age_group: AgeGroupRow | null; 
+  team_staff: TeamStaffRow[];
+};
+
 export async function GET() {
   const supabase = supabaseService();
 
-  console.log("🔥 ===============================");
   console.log("🔥 FETCH TEAMS START");
 
-  /* -------------------------
-     FETCH FROM DB
-  ------------------------- */
   const { data, error } = await supabase
     .from("teams")
     .select(`
@@ -18,42 +37,50 @@ export async function GET() {
       team_name,
       format,
       age_group:age_groups (
-        name_es
+        name_en
+      ),
+      team_staff (
+        role,
+        staff:staff (
+          first_name,
+          last_name
+        )
       )
     `)
     .order("display_name");
 
   if (error) {
-    console.error("❌ TEAMS FETCH ERROR:", error);
+    console.error("❌ ERROR:", error);
     return NextResponse.json(null, { status: 500 });
   }
 
-  console.log("📦 RAW TEAMS DATA:", data);
+  const teams = (data || []) as unknown as TeamRow[];
 
-  if (!data || data.length === 0) {
-    console.warn("⚠️ NO TEAMS FOUND IN DATABASE");
-  }
+  const formatted = teams.map((t) => {
+    const headCoach = t.team_staff?.find(
+      (s) => s.role?.toLowerCase().trim() === "head coach"
+    );
 
-  /* -------------------------
-     FORMAT DATA
-  ------------------------- */
-  const formatted = data.map((t: any) => {
-    const formattedTeam = {
+    const coach = headCoach?.staff;
+
+    const result = {
       id: t.id,
       display_name: t.display_name,
       team_name: t.team_name,
       format: t.format,
-      age_group_name: t.age_group?.name_es || null,
+
+      // ✅ FIX HERE
+      age_group_name: t.age_group?.name_en || null,
+
+      head_coach: coach
+        ? `${coach.first_name} ${coach.last_name}`
+        : "Unassigned",
     };
 
-    console.log("🔄 FORMATTED TEAM:", formattedTeam);
+    console.log("✅ FINAL TEAM:", result);
 
-    return formattedTeam;
+    return result;
   });
-
-  console.log("✅ FINAL TEAMS RESPONSE:", formatted);
-  console.log("🔥 FETCH TEAMS COMPLETE");
-  console.log("🔥 ===============================");
 
   return NextResponse.json(formatted);
 }
