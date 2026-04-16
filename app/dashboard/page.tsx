@@ -1,40 +1,52 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { Player } from "@/types/player";
 
-type Player = {
-  player: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    player_team?: {
-      team?: {
-        id: string;
-        display_name: string;
-        billing_plans?: {
-          amount: number;
-          interval: string;
-          active: boolean;
-        }[];
-      };
-    }[];
-    subscriptions?: {
-      status: string;
-      paid_at?: string;
-      next_due_date?: string;
-    }[];
-  };
+import Link from "next/link";
+
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+
+import { Button } from "@/components/ui/button";
+
+/* -------------------------
+   EXTENDED TYPE
+------------------------- */
+type PlayerWithBilling = Player & {
+  balance?: number;
+  last_payment_date?: string | null;
+  total_paid_season?: number;
+  next_payment_date?: string | null;
+  next_billing_date?: string | null;
+  months_overdue?: number;
 };
 
+/* -------------------------
+   DATE FORMATTER
+------------------------- */
+function formatDate(date?: string | null) {
+  if (!date) return "—";
+
+  return new Date(date).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function Dashboard() {
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [players, setPlayers] = useState<PlayerWithBilling[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/players/me")
       .then((res) => res.json())
       .then((data) => {
-        setPlayers(data || []);
+        setPlayers(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -46,118 +58,138 @@ export default function Dashboard() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        player_id: playerId,
-      }),
+      body: JSON.stringify({ player_id: playerId }),
     });
-
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err?.error || "Payment error");
-      return;
-    }
 
     const data = await res.json();
 
-    if (data.url) {
-      window.location.href = data.url;
+    if (!res.ok) {
+      alert(data?.error || "Payment error");
+      return;
     }
+
+    if (data.url) window.location.assign(data.url);
   }
 
+  /* -------------------------
+     GLOBAL STATE
+  ------------------------- */
+  const overduePlayers = players.filter(
+    (p) => (p.months_overdue ?? 0) > 0
+  );
+
   return (
-    <div className="p-10 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">Your Children</h1>
-      </div>
+    <div className="p-10 space-y-8">
+      <h1 className="text-2xl font-semibold">Parent Dashboard</h1>
 
-      {loading && <p>Loading...</p>}
-
-      {!loading && players.length === 0 && (
-        <p>No players assigned to your account</p>
+      {/* -------------------------
+         GLOBAL ALERT
+      ------------------------- */}
+      {!loading && (
+        overduePlayers.length > 0 ? (
+          <Alert variant="destructive">
+            <AlertTitle>Payment required</AlertTitle>
+            <AlertDescription>
+              {overduePlayers.length} child
+              {overduePlayers.length > 1 ? "ren have" : " has"} overdue payments.
+              Please review below.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert>
+            <AlertTitle>All up to date</AlertTitle>
+            <AlertDescription>
+              No outstanding payments.
+            </AlertDescription>
+          </Alert>
+        )
       )}
 
-      <div className="space-y-4">
+      {/* -------------------------
+         PLAYERS
+      ------------------------- */}
+      {loading && <p>Loading...</p>}
+
+      <div className="grid md:grid-cols-2 gap-6">
         {players.map((p) => {
-          const now = new Date();
-
-          const activeSub = p.player.subscriptions?.find(
-            (s) => s.status === "active"
-          );
-
-          const isOverdue =
-            activeSub?.next_due_date &&
-            new Date(activeSub.next_due_date) < now;
-
-          const hasActive = !!activeSub && !isOverdue;
-
-          const paidDate = activeSub?.paid_at
-            ? new Date(activeSub.paid_at).toLocaleDateString()
-            : null;
-
-          const nextDue = activeSub?.next_due_date
-            ? new Date(activeSub.next_due_date).toLocaleDateString()
-            : null;
-
-          const team = p.player.player_team?.[0]?.team;
-          const plan = team?.billing_plans?.find((bp) => bp.active);
-
-          const price = plan ? plan.amount / 100 : null;
-          const interval = plan?.interval;
+          const balance = p.balance ?? 0;
+          const overdue = p.months_overdue ?? 0;
 
           return (
             <div
-              key={p.player.id}
-              className="border p-4 rounded space-y-2"
+              key={p.id}
+              className="border rounded-lg p-5 space-y-4 bg-white"
             >
-              <div className="font-medium">
-                {p.player.first_name} {p.player.last_name}
+              {/* HEADER */}
+              <div className="flex justify-between items-center">
+                <div className="text-lg font-medium">
+                  {p.first_name} {p.last_name}
+                </div>
+
+                {overdue > 0 ? (
+                  <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">
+                    {overdue} overdue
+                  </span>
+                ) : (
+                  <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded">
+                    Up to date
+                  </span>
+                )}
               </div>
 
-              {team?.display_name && (
-                <div className="text-sm text-gray-500">
-                  {team.display_name}
+              {/* FINANCIAL SUMMARY */}
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Outstanding</span>
+                  <span className="font-medium text-red-500">
+                    €{(balance / 100).toFixed(2)}
+                  </span>
                 </div>
-              )}
 
-              {price && (
-                <div className="text-sm text-gray-700">
-                  €{price} / {interval}
+                <div className="flex justify-between">
+                  <span>Paid this season</span>
+                  <span>
+                    €{((p.total_paid_season ?? 0) / 100).toFixed(2)}
+                  </span>
                 </div>
-              )}
+              </div>
 
-              {hasActive ? (
-                <div className="text-green-600 text-sm font-medium">
-                  ✅ Subscription Active
+              {/* DATES */}
+              <div className="text-xs text-gray-500 space-y-1">
+                <div>
+                  Last payment: {formatDate(p.last_payment_date)}
                 </div>
-              ) : isOverdue ? (
-                <div className="text-orange-600 text-sm font-medium">
-                  ⚠️ Payment Overdue
+                <div>
+                  Next due: {formatDate(p.next_payment_date)}
                 </div>
-              ) : (
-                <div className="text-red-500 text-sm font-medium">
-                  ❌ Not Paid
+                <div>
+                  Next billing: {formatDate(p.next_billing_date)}
                 </div>
-              )}
+              </div>
 
-              {hasActive && (
-                <div className="text-sm text-gray-600 space-y-1">
-                  {paidDate && <div>Paid: {paidDate}</div>}
-                  {nextDue && <div>Next due: {nextDue}</div>}
-                </div>
-              )}
-
-              {(!hasActive || isOverdue) && (
-                <button
-                  onClick={() => handlePay(p.player.id)}
-                  className="bg-green-600 text-white px-3 py-1 rounded"
+              {/* ACTION */}
+              {balance > 0 && (
+                <Button
+                  onClick={() => handlePay(p.id)}
+                  className="w-full"
                 >
-                  {price ? `Pay €${price}` : "Pay Subscription"}
-                </button>
+                  Pay €{(balance / 100).toFixed(2)}
+                </Button>
               )}
             </div>
           );
         })}
+      </div>
+
+      {/* -------------------------
+         NAVIGATION
+      ------------------------- */}
+      <div>
+        <Link href="/payments">
+          <Button variant="outline">
+            View full payment history
+          </Button>
+        </Link>
       </div>
     </div>
   );

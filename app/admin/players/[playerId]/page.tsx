@@ -22,16 +22,7 @@ export default async function Page({ params }: Props) {
     .from("players")
     .select(`
       *,
-
-      subscriptions (
-        id,
-        status,
-        amount,
-        created_at,
-        paid_at,
-        next_due_date
-      ),
-
+      
       player_history (
         id,
         season,

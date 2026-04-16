@@ -213,7 +213,7 @@ export default function AdminPlayers() {
   }
 
   return (
-    <div className="p-10 space-y-6 max-w-6xl mx-auto">
+    <div className="p-10 space-y-6 w-full">
 
       {/* HEADER */}
       <div className="flex justify-between items-center">

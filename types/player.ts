@@ -12,23 +12,18 @@ export type PlayerHistory = {
   } | null;
 };
 
-export type Subscription = {
-  id: string;
-  status: string;
-  amount: number;
-  created_at: string;
-  paid_at?: string | null;
-  next_due_date?: string | null;
-};
-
+/* -------------------------
+   NEW CORE PLAYER TYPE
+------------------------- */
 export type Player = {
   id: string;
   first_name: string;
   last_name: string;
+
   parent_email?: string | null;
   date_of_birth?: string | null;
   date_joined?: string | null;
-  created_at: string;
+  created_at?: string;
 
   preferred_foot?: string | null;
 
@@ -48,7 +43,8 @@ export type Player = {
   team_id?: string | null;
   team_name?: string | null;
 
-  /* ✅ FIXED (NO ANY) */
   player_history?: PlayerHistory[];
-  subscriptions?: Subscription[];
+
+  /* ✅ NEW (IMPORTANT) */
+  balance?: number; // 💥 from API
 };

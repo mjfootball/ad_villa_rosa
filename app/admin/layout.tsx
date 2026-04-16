@@ -2,9 +2,13 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 
+import { AppSidebar } from "@/components/app-sidebar";
 import { supabaseService } from "@/lib/supabase/service";
 
 export default async function AdminLayout({
@@ -15,7 +19,7 @@ export default async function AdminLayout({
   const cookieStore = await cookies();
 
   /* -------------------------
-     1. AUTH
+     AUTH
   ------------------------- */
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,12 +37,10 @@ export default async function AdminLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/sign-in");
-  }
+  if (!user) redirect("/sign-in");
 
   /* -------------------------
-     2. ROLE CHECK (ADMIN)
+     ROLE CHECK
   ------------------------- */
   const supabaseAdmin = supabaseService();
 
@@ -53,19 +55,19 @@ export default async function AdminLayout({
   }
 
   /* -------------------------
-     3. UI (RESTORED)
+     UI (FIXED)
   ------------------------- */
   return (
     <SidebarProvider>
-      <AppSidebar />
+  <AppSidebar />
 
-      <main className="flex-1 p-6 bg-gray-50 min-h-screen">
-        <div className="mb-4">
-          <SidebarTrigger />
-        </div>
+  <SidebarInset>
+    <header className="md:hidden">
+      <SidebarTrigger />
+    </header>
 
-        {children}
-      </main>
-    </SidebarProvider>
+    {children}
+  </SidebarInset>
+</SidebarProvider>
   );
 }

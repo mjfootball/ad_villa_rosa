@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 import {
   Table,
@@ -30,7 +30,7 @@ type PlayerRow = {
 ------------------------- */
 function formatDate(date?: string | null) {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString();
+  return new Date(date).toLocaleDateString("en-GB");
 }
 
 /* -------------------------
@@ -40,23 +40,68 @@ export default function AdminPayments() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "overdue" | "paid">("all");
 
+  const now = new Date();
+
+  /* -------------------------
+     FETCH
+  ------------------------- */
   useEffect(() => {
     fetch("/api/admin/payments")
       .then((res) => res.json())
       .then((data) => {
-        // ✅ ONLY SHOW PLAYERS WITH SUBSCRIPTION
-        const filtered = data.filter(
-          (p: PlayerRow) => p.next_due_date !== null
-        );
-
-        setPlayers(filtered);
+        setPlayers(data || []);
         setLoading(false);
       });
   }, []);
 
-  const now = new Date();
+  /* -------------------------
+     DERIVED DATA
+  ------------------------- */
+  const enriched = useMemo(() => {
+    return players.map((p) => {
+      const isOverdue =
+        p.next_due_date &&
+        new Date(p.next_due_date) < now;
 
+      const isPaid =
+        p.next_due_date &&
+        new Date(p.next_due_date) >= now;
+
+      return {
+        ...p,
+        isOverdue,
+        isPaid,
+      };
+    });
+  }, [players]);
+
+  const filtered = useMemo(() => {
+    if (filter === "overdue") {
+      return enriched.filter((p) => p.isOverdue);
+    }
+    if (filter === "paid") {
+      return enriched.filter((p) => p.isPaid);
+    }
+    return enriched;
+  }, [enriched, filter]);
+
+  /* -------------------------
+     KPIs
+  ------------------------- */
+  const totalOutstanding = enriched.reduce(
+    (sum, p) => sum + (p.isOverdue ? p.amount || 0 : 0),
+    0
+  );
+
+  const overdueCount = enriched.filter((p) => p.isOverdue).length;
+
+  const totalActive = enriched.length;
+
+  /* -------------------------
+     ACTION
+  ------------------------- */
   async function sendPaymentRequest(playerId: string) {
     try {
       setSendingId(playerId);
@@ -71,30 +116,76 @@ export default function AdminPayments() {
         }),
       });
 
-      if (!res.ok) {
-        throw new Error("Failed");
-      }
+      if (!res.ok) throw new Error();
 
-      alert("Payment request sent ✅");
     } catch (err) {
       console.error(err);
-      alert("Failed to send request ❌");
     } finally {
       setSendingId(null);
     }
   }
 
+  /* -------------------------
+     RENDER
+  ------------------------- */
   if (loading) return <div className="p-10">Loading...</div>;
 
   return (
-    <div className="p-10 space-y-6">
+    <div className="p-10 space-y-8">
 
-      <h1 className="text-2xl font-semibold">
-        Payments Dashboard
-      </h1>
+      {/* HEADER */}
+      <div>
+        <h1 className="text-2xl font-semibold">
+          Payments Dashboard
+        </h1>
+        <p className="text-sm text-gray-500">
+          Monitor payments, outstanding balances, and send reminders
+        </p>
+      </div>
 
+      {/* KPI CARDS */}
+      <div className="grid md:grid-cols-3 gap-4">
+
+        <div className="border p-4 rounded">
+          <div className="text-sm text-gray-500">Outstanding</div>
+          <div className="text-xl font-semibold text-red-600">
+            €{(totalOutstanding / 100).toFixed(2)}
+          </div>
+        </div>
+
+        <div className="border p-4 rounded">
+          <div className="text-sm text-gray-500">Overdue Players</div>
+          <div className="text-xl font-semibold">
+            {overdueCount}
+          </div>
+        </div>
+
+        <div className="border p-4 rounded">
+          <div className="text-sm text-gray-500">Active Players</div>
+          <div className="text-xl font-semibold">
+            {totalActive}
+          </div>
+        </div>
+
+      </div>
+
+      {/* FILTERS */}
+      <div className="flex gap-2">
+        {["all", "overdue", "paid"].map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f as any)}
+            className={`px-3 py-1 rounded text-sm border ${
+              filter === f ? "bg-black text-white" : ""
+            }`}
+          >
+            {f.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
+      {/* TABLE */}
       <Table>
-
         <TableHeader>
           <TableRow>
             <TableHead>Player</TableHead>
@@ -108,80 +199,56 @@ export default function AdminPayments() {
         </TableHeader>
 
         <TableBody>
-          {players.map((p) => {
-            const isOverdue =
-              p.next_due_date &&
-              new Date(p.next_due_date) < now;
+          {filtered.map((p) => (
+            <TableRow key={p.id}>
 
-            const isActive =
-              p.next_due_date &&
-              new Date(p.next_due_date) >= now;
+              <TableCell className="font-medium">
+                {p.first_name} {p.last_name}
+              </TableCell>
 
-            return (
-              <TableRow key={p.id}>
+              <TableCell>{p.team_name || "—"}</TableCell>
 
-                {/* PLAYER */}
-                <TableCell className="font-medium">
-                  {p.first_name} {p.last_name}
-                </TableCell>
+              <TableCell
+                className={
+                  p.isPaid
+                    ? "text-green-600"
+                    : p.isOverdue
+                    ? "text-red-600"
+                    : "text-gray-500"
+                }
+              >
+                {p.isPaid
+                  ? "Paid"
+                  : p.isOverdue
+                  ? "Overdue"
+                  : "Pending"}
+              </TableCell>
 
-                {/* TEAM */}
-                <TableCell>
-                  {p.team_name || "—"}
-                </TableCell>
+              <TableCell>{formatDate(p.last_paid)}</TableCell>
 
-                {/* STATUS */}
-                <TableCell
-                  className={
-                    isActive
-                      ? "text-green-600"
-                      : isOverdue
-                      ? "text-red-600"
-                      : "text-gray-500"
-                  }
+              <TableCell>{formatDate(p.next_due_date)}</TableCell>
+
+              <TableCell className="text-right">
+                {p.amount
+                  ? `€${(p.amount / 100).toFixed(2)}`
+                  : "—"}
+              </TableCell>
+
+              <TableCell className="text-right">
+                <button
+                  onClick={() => sendPaymentRequest(p.id)}
+                  disabled={sendingId === p.id}
+                  className="bg-black text-white px-3 py-1 rounded text-sm disabled:opacity-50"
                 >
-                  {isActive
-                    ? "Paid"
-                    : isOverdue
-                    ? "Overdue"
-                    : "Unknown"}
-                </TableCell>
+                  {sendingId === p.id
+                    ? "Sending..."
+                    : "Send Request"}
+                </button>
+              </TableCell>
 
-                {/* LAST PAID */}
-                <TableCell>
-                  {formatDate(p.last_paid)}
-                </TableCell>
-
-                {/* NEXT DUE */}
-                <TableCell>
-                  {formatDate(p.next_due_date)}
-                </TableCell>
-
-                {/* AMOUNT */}
-                <TableCell className="text-right">
-                  {p.amount
-                    ? `€${(p.amount / 100).toFixed(2)}`
-                    : "—"}
-                </TableCell>
-
-                {/* ACTION (🔥 UPDATED) */}
-                <TableCell className="text-right">
-                  <button
-                    onClick={() => sendPaymentRequest(p.id)}
-                    disabled={sendingId === p.id}
-                    className="bg-black text-white px-3 py-1 rounded text-sm disabled:opacity-50"
-                  >
-                    {sendingId === p.id
-                      ? "Sending..."
-                      : "Send Request"}
-                  </button>
-                </TableCell>
-
-              </TableRow>
-            );
-          })}
+            </TableRow>
+          ))}
         </TableBody>
-
       </Table>
     </div>
   );

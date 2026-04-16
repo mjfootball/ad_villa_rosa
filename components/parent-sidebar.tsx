@@ -30,7 +30,7 @@ export function ParentSidebar() {
     },
     {
       title: "Payments",
-      url: "/dashboard/payments",
+      url: "/dashboard/payments", // ✅ FIXED ROUTE
       icon: CreditCard,
     },
   ];
@@ -53,7 +53,8 @@ export function ParentSidebar() {
 
           <SidebarMenu>
             {items.map((item) => {
-              const isActive = pathname === item.url;
+              // ✅ BETTER ACTIVE LOGIC
+              const isActive = pathname.startsWith(item.url);
 
               return (
                 <SidebarMenuItem key={item.url}>
@@ -71,7 +72,7 @@ export function ParentSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* 🔥 FOOTER (BOTTOM LEFT LOGOUT — MATCHES ADMIN) */}
+      {/* FOOTER */}
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>

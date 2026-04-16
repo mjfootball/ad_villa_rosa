@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
-import { UserCog } from "lucide-react"; //
+import { UserCog, CircleDot } from "lucide-react";
+
 import {
   Sidebar,
   SidebarContent,
@@ -13,7 +14,6 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
-  SidebarTrigger, // 🔥 ADD THIS
   useSidebar,
 } from "@/components/ui/sidebar";
 
@@ -34,22 +34,19 @@ export function AppSidebar() {
   const router = useRouter();
   const supabase = supabaseBrowser();
 
-  const { setOpen } = useSidebar();
+  const { setOpen, state } = useSidebar(); // ✅ ADD state
 
   /* -------------------------
      NAV GROUPS
   ------------------------- */
 
   const coreItems = [
-  { title: "Players", url: "/admin/players", icon: Users },
-  { title: "Teams", url: "/admin/teams", icon: Layers },
-
-  
-  { title: "Staff", url: "/admin/staff", icon: UserCog },
-
-  { title: "Billing", url: "/admin/billing", icon: CreditCard },
-  { title: "Payments", url: "/admin/payments", icon: Euro },
-];
+    { title: "Players", url: "/admin/players", icon: Users },
+    { title: "Teams", url: "/admin/teams", icon: Layers },
+    { title: "Staff", url: "/admin/staff", icon: UserCog },
+    { title: "Billing", url: "/admin/billing", icon: CreditCard },
+    { title: "Payments", url: "/admin/payments", icon: Euro },
+  ];
 
   const contentItems = [
     { title: "Posts", url: "/admin/posts", icon: FileText },
@@ -71,16 +68,20 @@ export function AppSidebar() {
      LINK CLICK
   ------------------------- */
   function handleLinkClick() {
-    setOpen(false); // collapse on navigation
+    setOpen(false);
   }
 
   return (
     <Sidebar collapsible="icon">
 
-      {/* 🔥 TOP BAR (LOGO + TOGGLE) */}
-      <div className="p-4 border-b flex items-center justify-between">
+      {/* 🔥 HEADER */}
+      <div className="p-4 border-b flex items-center justify-center">
 
-        <div className="flex items-center gap-3">
+        {state === "collapsed" ? (
+          /* ⚽ COLLAPSED ICON */
+          <CircleDot className="size-6 text-black" />
+        ) : (
+          /* 🏷 FULL LOGO */
           <Image
             src="/images/logo.png"
             alt="MJ Football"
@@ -89,10 +90,7 @@ export function AppSidebar() {
             className="h-12 w-auto"
             priority
           />
-        </div>
-
-        {/* 🔥 THIS FIXES YOUR ISSUE */}
-        <SidebarTrigger />
+        )}
 
       </div>
 
@@ -115,7 +113,9 @@ export function AppSidebar() {
                       className="flex items-center gap-2 w-full"
                     >
                       <item.icon />
-                      <span>{item.title}</span>
+                      {state !== "collapsed" && (
+                        <span>{item.title}</span>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -141,7 +141,9 @@ export function AppSidebar() {
                       className="flex items-center gap-2 w-full"
                     >
                       <item.icon />
-                      <span>{item.title}</span>
+                      {state !== "collapsed" && (
+                        <span>{item.title}</span>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -167,7 +169,9 @@ export function AppSidebar() {
                       className="flex items-center gap-2 w-full"
                     >
                       <item.icon />
-                      <span>{item.title}</span>
+                      {state !== "collapsed" && (
+                        <span>{item.title}</span>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -187,7 +191,7 @@ export function AppSidebar() {
               className="text-red-600"
             >
               <LogOut />
-              <span>Log out</span>
+              {state !== "collapsed" && <span>Log out</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
