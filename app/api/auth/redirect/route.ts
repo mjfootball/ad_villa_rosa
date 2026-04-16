@@ -8,11 +8,33 @@ export async function GET() {
 
     const supabaseAdmin = supabaseService();
 
-    const { data: internalUser } = await supabaseAdmin
-      .from("users")
-      .select("role")
-      .eq("auth_user_id", user.id)
-      .single();
+    let { data: internalUser } = await supabaseAdmin
+  .from("users")
+  .select("*")
+  .eq("auth_user_id", user.id)
+  .maybeSingle();
+
+/* -------------------------
+   AUTO CREATE USER
+------------------------- */
+if (!internalUser) {
+  console.log("➕ Creating internal user (fallback)");
+
+  const { data: newUser } = await supabaseAdmin
+    .from("users")
+    .insert({
+      auth_user_id: user.id,
+      email: user.email,
+      name:
+        user.user_metadata?.name ||
+        user.email?.split("@")[0],
+      role: "parent",
+    })
+    .select()
+    .single();
+
+  internalUser = newUser;
+}
 
     console.log("🔀 ROUTE DECISION:", internalUser);
 
