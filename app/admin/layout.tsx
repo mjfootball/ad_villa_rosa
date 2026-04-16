@@ -62,9 +62,13 @@ export default async function AdminLayout({
   <AppSidebar />
 
   <SidebarInset>
-    <header className="md:hidden">
-      <SidebarTrigger />
-    </header>
+    <header className="flex items-center justify-between p-4 border-b">
+  <SidebarTrigger />
+
+  <div className="font-semibold">
+    Admin
+  </div>
+</header>
 
     {children}
   </SidebarInset>

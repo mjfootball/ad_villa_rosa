@@ -20,7 +20,7 @@ export type Staff = {
   first_name: string;
   last_name: string;
   email?: string | null;
-  avatar_url?: string | null; // ✅ NEW
+  avatar_url?: string | null;
 };
 
 /* -------------------------
@@ -39,7 +39,7 @@ export const staffColumns = (
       return (
         <div className="flex items-center gap-3">
 
-          {/* 🔥 AVATAR */}
+          {/* AVATAR */}
           {s.avatar_url ? (
             <img
               src={s.avatar_url}
@@ -67,7 +67,7 @@ export const staffColumns = (
     header: "Email",
   },
 
-  /* 🔥 ACTIONS */
+  /* ACTIONS */
   {
     id: "actions",
     cell: ({ row }) => {
@@ -76,7 +76,10 @@ export const staffColumns = (
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="p-2 hover:bg-muted rounded">
+            <button
+              className="p-2 hover:bg-muted rounded"
+              onClick={(e) => e.stopPropagation()} // 🔥 FIX 1
+            >
               <MoreHorizontal className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>
@@ -85,19 +88,30 @@ export const staffColumns = (
 
             {/* VIEW PROFILE */}
             <DropdownMenuItem asChild>
-              <Link href={`/admin/staff/${s.id}`}>
+              <Link
+                href={`/admin/staff/${s.id}`}
+                onClick={(e) => e.stopPropagation()} // 🔥 FIX 2
+              >
                 View Profile
               </Link>
             </DropdownMenuItem>
 
             {/* EDIT */}
-            <DropdownMenuItem onClick={() => onEdit(s)}>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation(); // 🔥 FIX 3
+                onEdit(s);
+              }}
+            >
               Edit
             </DropdownMenuItem>
 
             {/* DELETE */}
             <DropdownMenuItem
-              onClick={() => onDelete(s)}
+              onClick={(e) => {
+                e.stopPropagation(); // 🔥 FIX 4
+                onDelete(s);
+              }}
               className="text-red-600"
             >
               Delete
